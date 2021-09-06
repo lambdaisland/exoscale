@@ -1,0 +1,4 @@
+{:deps {babashka/process {:mvn/version "0.0.2"}
+        cheshire/cheshire {:mvn/version "5.10.0"}
+        java-http-clj/java-http-clj {:mvn/version "0.4.3"}
+        lambdaisland/uri {:mvn/version "1.4.74"}}}

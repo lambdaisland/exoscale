@@ -1,0 +1,6 @@
+{:deps {java-http-clj/java-http-clj {:mvn/version "0.4.3"}
+        lambdaisland/uri {:mvn/version "1.4.74"}
+        lambdaisland/open-source {:git/url "https://github.com/lambdaisland/open-source"
+                                  :sha "456f7a7620f119aa24f96cd6db0a36cd33988f6f"
+                                  #_#_:local/root "../open-source"}}
+ :min-bb-version "0.6.0"}
