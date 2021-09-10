@@ -10,7 +10,8 @@
             [cheshire.core :as json]))
 
 (def v1-base-url (uri/uri "https://api.exoscale.com"))
-(def v2-base-url (uri/uri "https://api-ch-gva-2.exoscale.com"))
+(defn v2-base-url [zone]
+  (uri/uri (str "https://api-" zone ".exoscale.com")))
 
 (defn creds
   "Try to find the Exoscale API credentials
@@ -73,34 +74,6 @@
          ",expires=" ts
          ",signature=" (hmac api-secret msg :sha256))))
 
-(defn api-request-v1
-  ([method path]
-   (api-request-v1 method path nil))
-  ([method path opts]
-   (let [[key secret] (:creds opts (creds))
-         uri (uri/assoc-query (uri/join v1-base-url path) :apikey key)
-         signature (hmac
-                    secret
-                    (str/lower-case
-                     (uri/map->query-string
-                      (into (sorted-map)
-                            (uri/query-map uri))))
-                    :sha1)
-         uri (uri/assoc-query uri :signature signature)]
-     (assert (and key secret))
-     (update (http/send
-              (merge {:uri (uri/uri-str uri)
-                      :method method}
-                     opts))
-             :body
-             (fn [body]
-               (try
-                 (with-meta
-                   (json/parse-string body true)
-                   {:raw body})
-                 (catch Exception e
-                   {:parse-error e
-                    :body body})))))))
 
 (defn api-request-v2
   "Perform an API request to the v2 API"
@@ -108,18 +81,24 @@
    (api-request-v2 method path nil))
   ([method path opts]
    (let [[key secret] (:creds opts (creds))
-         uri (uri/join v2-base-url path)]
+         uri (uri/join (v2-base-url (:zone opts "de-muc-1")) path)
+         opts (cond-> opts
+                (and (:body opts) (coll? (:body opts)))
+                (update :body json/generate-string))]
      (assert (and key secret))
      (update (http/send
-              (merge {:uri (uri/uri-str uri)
-                      :method method
-                      :headers {"Authorization"
-                                (auth-header {:method method
-                                              :uri uri
-                                              :body (:body opts)
-                                              :api-key key
-                                              :api-secret secret})}}
-                     opts))
+              (doto
+                  (merge {:uri (uri/uri-str uri)
+                          :method method
+                          :headers {"Authorization"
+                                    (auth-header {:method method
+                                                  :uri uri
+                                                  :body (:body opts)
+                                                  :api-key key
+                                                  :api-secret secret})
+                                    "Content-Type" "application/json"}}
+                         opts)
+                #_(clojure.pprint/pprint)))
              :body
              (fn [body]
                (try
