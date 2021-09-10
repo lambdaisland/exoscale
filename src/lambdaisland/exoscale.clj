@@ -74,6 +74,37 @@
          ",expires=" ts
          ",signature=" (hmac api-secret msg :sha256))))
 
+(defn api-request-v1
+  ([method path]
+   (api-request-v1 method path nil))
+  ([method path opts]
+   (let [[key secret] (:creds opts (creds))
+         uri (uri/assoc-query (uri/join v1-base-url path) :apikey key)
+         signature (hmac
+                    secret
+                    (str/lower-case
+                     (uri/map->query-string
+                      (into (sorted-map)
+                            (uri/query-map uri))))
+                    :sha1)
+         uri (uri/assoc-query uri :signature signature)
+         opts (cond-> opts
+                (and (:body opts) (coll? (:body opts)))
+                (update :body json/generate-string))]
+     (assert (and key secret))
+     (update (http/send
+              (merge {:uri (uri/uri-str uri)
+                      :method method}
+                     opts))
+             :body
+             (fn [body]
+               (try
+                 (with-meta
+                   (json/parse-string body true)
+                   {:raw body})
+                 (catch Exception e
+                   {:parse-error e
+                    :body body})))))))
 
 (defn api-request-v2
   "Perform an API request to the v2 API"
