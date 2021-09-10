@@ -96,7 +96,7 @@
              (fn [body]
                (try
                  (with-meta
-                   (json/parse-string body)
+                   (json/parse-string body true)
                    {:raw body})
                  (catch Exception e
                    {:parse-error e
@@ -124,7 +124,7 @@
              (fn [body]
                (try
                  (with-meta
-                   (json/parse-string body)
+                   (json/parse-string body true)
                    {:raw body})
                  (catch Exception e
                    {:parse-error e
