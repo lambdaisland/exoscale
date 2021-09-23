@@ -21,9 +21,11 @@
   - $EXOSCALE_API_KEY / $EXOSCALE_API_SECRET
   - $TF_VAR_exoscale_api_key / $TF_VAR_exoscale_secret_key"
   []
-  (let [creds (try
-                (slurp (str (System/getenv "HOME") "/.config/exoscale/exoscale.toml"))
-                (catch Exception e))]
+  (let [creds (some #(try
+                       (slurp (str (System/getenv "HOME") %))
+                       (catch Exception e))
+                    ["/.config/exoscale/exoscale.toml"
+                     "/Library/Application Support/exoscale/exoscale.toml"])]
     [(or (second (re-find #"key\s=\s\"(.*)\"" creds))
          (System/getenv "EXOSCALE_API_KEY")
          (System/getenv "TF_VAR_exoscale_api_key"))
@@ -75,6 +77,8 @@
          ",signature=" (hmac api-secret msg :sha256))))
 
 (defn api-request-v1
+  "Perform an API request to the v1 compute API, will calculate the signature
+  which gets added as a query-param."
   ([method path]
    (api-request-v1 method path nil))
   ([method path opts]
@@ -139,6 +143,29 @@
                  (catch Exception e
                    {:parse-error e
                     :body body})))))))
+
+(defn dns-api-request [method path opts]
+  (let [[key secret] (:creds opts (creds))
+        uri (uri/assoc-query (uri/join v1-base-url path) :apikey key)
+        opts (cond-> opts
+               (and (:body opts) (coll? (:body opts)))
+               (update :body json/generate-string))]
+    (assert (and key secret))
+    (update (http/send
+             (merge {:uri (uri/uri-str uri)
+                     :method method
+                     :headers {"X-DNS-Token" (str key ":" secret)
+                               "Content-Type" "application/json"}}
+                    opts))
+            :body
+            (fn [body]
+              (try
+                (with-meta
+                  (json/parse-string body true)
+                  {:raw body})
+                (catch Exception e
+                  {:parse-error e
+                   :body body}))))))
 
 (def get-v1 (partial api-request-v1 :get))
 (def post-v1 (partial api-request-v1 :post))
