@@ -21,17 +21,25 @@
   - $EXOSCALE_API_KEY / $EXOSCALE_API_SECRET
   - $TF_VAR_exoscale_api_key / $TF_VAR_exoscale_secret_key"
   []
-  (let [creds (some #(try
-                       (slurp (str (System/getenv "HOME") %))
-                       (catch Exception e))
-                    ["/.config/exoscale/exoscale.toml"
-                     "/Library/Application Support/exoscale/exoscale.toml"])]
-    [(or (second (re-find #"key\s=\s\"(.*)\"" creds))
-         (System/getenv "EXOSCALE_API_KEY")
-         (System/getenv "TF_VAR_exoscale_api_key"))
-     (or (second (re-find #"secret\s=\s\"(.*)\"" creds))
-         (System/getenv "EXOSCALE_API_SECRET")
-         (System/getenv "TF_VAR_exoscale_secret_key"))]))
+  (let [locations (map
+                   #(str (System/getenv "HOME") %)
+                   ["/.config/exoscale/exoscale.toml"
+                    "/Library/Application Support/exoscale/exoscale.toml"])
+        creds (some #(try (slurp %) (catch Exception e)) locations)
+        key (or (and creds (second (re-find #"key\s=\s\"(.*)\"" creds)))
+                (System/getenv "EXOSCALE_API_KEY")
+                (System/getenv "TF_VAR_exoscale_api_key"))
+        secret (or (and creds (second (re-find #"secret\s=\s\"(.*)\"" creds)))
+                   (System/getenv "EXOSCALE_API_SECRET")
+                   (System/getenv "TF_VAR_exoscale_secret_key"))]
+    (when-not (and key secret)
+      (throw (ex-info "Exoscale credentials not found, either set up the Exoscale CLI or set the EXOSCALE_API_{KEY,SECRET} env vars."
+                      {:tried-locations locations
+                       :tried-env-vars ["EXOSCALE_API_KEY"
+                                        "EXOSCALE_API_SECRET"
+                                        "TF_VAR_exoscale_api_key"
+                                        "TF_VAR_exoscale_secret_key"]})))
+    [key secret]))
 
 (defn- stream->bytes
   "Convert an input-stream to a bytes array"
